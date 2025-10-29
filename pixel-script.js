@@ -34,12 +34,32 @@ function injectPrivacyUI() {
 // Create centered privacy panel (desktop), with mobile full-width minus 10px
 var panel = d.createElement("div");
 panel.id = "privacy-choices-panel";
-panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:56px;z-index:99999;background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:12px 14px;max-width:360px;display:none;font:14px/1.45 system-ui,sans-serif;";
+panel.style.cssText = [
+  "position:fixed",
+  "left:50%",
+  "transform:translateX(-50%)",
+  "bottom:56px",
+  "z-index:2147483647",                 /* sit above sticky headers/modals */
+  "background:#fff",
+  "border:1px solid #ccc",
+  "border-radius:12px",
+  "box-shadow:0 6px 24px rgba(0,0,0,.15)",
+  "padding:12px 14px",
+  "max-width:360px",
+  "display:none",
+  "font:14px/1.45 system-ui,sans-serif",
+  "box-sizing:border-box",
+  "min-height:160px",                   /* ensure visible height */
+  "height:auto",
+  "max-height:calc(100vh - 120px)",     /* fit viewport; leave breathing room */
+  "overflow:auto"                       /* scroll if content exceeds max-height */
+].join(";") + ";";
 
-// Mobile override: 5px margins on left/right
+// Hardening overrides to beat theme rules
 (function(){
   var css = [
-    "@media (max-width: 600px){",
+    /* Mobile: 5px side gutters, full width */
+    "@media (max-width:600px){",
     "  #privacy-choices-panel{",
     "    left:5px !important;",
     "    right:5px !important;",
@@ -47,12 +67,21 @@ panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom
     "    max-width:none !important;",
     "    width:auto !important;",
     "  }",
+    "}",
+    /* Resist theme clamps on height/overflow/z-index */
+    "#privacy-choices-panel{",
+    "  min-height:160px !important;",
+    "  height:auto !important;",
+    "  max-height:calc(100vh - 120px) !important;",
+    "  overflow:auto !important;",
+    "  z-index:2147483647 !important;",
     "}"
-  ].join("");
+  ].join("\n");
   var st = d.createElement("style");
   st.textContent = css;
   d.head.appendChild(st);
 })();
+
 
 
   // Freeze hover/active/focus styles for Save/Close and inherit panel text color
