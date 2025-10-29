@@ -27,130 +27,124 @@
     if (on) removePixel(); else if (!hasGPC) loadPixel();
   }
 
-  // 4) Panel (Do Not Sell/Share / Targeted Ads opt-out)
-function injectPrivacyUI() {
-  if (d.getElementById("privacy-choices-panel")) return;
+  // 4) Panel (Do Not Sell/Share / Targeted Ads opt-out) — Shadow DOM to isolate from theme CSS
+  function injectPrivacyUI() {
+    if (d.getElementById("privacy-choices-panel")) return;
 
-// Create centered privacy panel (desktop), with mobile full-width minus 10px
-var panel = d.createElement("div");
-panel.id = "privacy-choices-panel";
-panel.style.cssText = [
-  "position:fixed",
-  "left:50%",
-  "transform:translateX(-50%)",
-  "bottom:56px",
-  "z-index:2147483647",                 /* sit above sticky headers/modals */
-  "background:#fff",
-  "border:1px solid #ccc",
-  "border-radius:12px",
-  "box-shadow:0 6px 24px rgba(0,0,0,.15)",
-  "padding:12px 14px",
-  "max-width:360px",
-  "display:none",
-  "font:14px/1.45 system-ui,sans-serif",
-  "box-sizing:border-box",
-  "min-height:160px",                   /* ensure visible height */
-  "height:auto",
-  "max-height:calc(100vh - 120px)",     /* fit viewport; leave breathing room */
-  "overflow:auto"                       /* scroll if content exceeds max-height */
-].join(";") + ";";
+    // Host element (positioned container)
+    var panel = d.createElement("div");
+    panel.id = "privacy-choices-panel";
+    panel.style.cssText = [
+      "position:fixed",
+      "left:50%",
+      "transform:translateX(-50%)",
+      "bottom:56px",
+      "display:none",
+      "z-index:2147483647"
+    ].join(";") + ";";
+    d.body.appendChild(panel);
 
-// Hardening overrides to beat theme rules
-(function(){
-  var css = [
-    /* Mobile: 5px side gutters, full width */
-    "@media (max-width:600px){",
-    "  #privacy-choices-panel{",
-    "    left:5px !important;",
-    "    right:5px !important;",
-    "    transform:none !important;",
-    "    max-width:none !important;",
-    "    width:auto !important;",
-    "  }",
-    "}",
-    /* Resist theme clamps on height/overflow/z-index */
-    "#privacy-choices-panel{",
-    "  min-height:160px !important;",
-    "  height:auto !important;",
-    "  max-height:calc(100vh - 120px) !important;",
-    "  overflow:auto !important;",
-    "  z-index:2147483647 !important;",
-    "}"
-  ].join("\n");
-  var st = d.createElement("style");
-  st.textContent = css;
-  d.head.appendChild(st);
-})();
+    // Shadow root (theme-safe)
+    var root = panel.attachShadow({ mode: "open" });
 
+    // Styles inside shadow root
+    var style = d.createElement("style");
+    style.textContent = `
+      :host{
+        box-sizing:border-box !important;
+        background:#fff !important;
+        color:#222 !important;
+        border:1px solid #ccc !important;
+        border-radius:12px !important;
+        box-shadow:0 6px 24px rgba(0,0,0,.15) !important;
+        max-width:360px !important;
 
+        /* Height controls to prevent tiny pill clamp */
+        min-height:160px !important;
+        max-height:calc(100vh - 120px) !important;
+        overflow:auto !important;
+        -webkit-overflow-scrolling:touch;
+      }
+      @media (max-width:600px){
+        :host{
+          left:5px !important;
+          right:5px !important;
+          transform:none !important;
+          max-width:none !important;
+          width:auto !important;
+        }
+      }
+      *, *::before, *::after{ box-sizing:border-box; }
+      .wrap{ padding:12px 14px; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+      h1{ margin:0 0 6px 0; font-size:14px; font-weight:600; }
+      label{ display:flex; gap:8px; align-items:flex-start; margin:6px 0 10px; }
+      input[type="checkbox"]{ all:revert; margin-top:3px; }
+      .row{ display:flex; gap:8px; margin-bottom:8px; }
+      button{
+        padding:6px 10px; border:1px solid currentColor; border-radius:8px;
+        background:#fff; color:inherit; cursor:pointer;
+      }
+      button:hover, button:active, button:focus{
+        background:#fff; box-shadow:none; outline:none; transition:none;
+      }
+      details{ font-size:12px; color:#555; }
+      summary{ cursor:pointer; }
+    `;
+    root.appendChild(style);
 
-  // Freeze hover/active/focus styles for Save/Close and inherit panel text color
-  (function(){
-    var css = [
-      "#privacy-save, #privacy-close,",
-      "#privacy-save:hover, #privacy-close:hover,",
-      "#privacy-save:active, #privacy-close:active,",
-      "#privacy-save:focus, #privacy-close:focus {",
-      "  color: inherit !important;",
-      "  border-color: currentColor !important;",
-      "  background: #fff !important;",
-      "  outline: none !important;",
-      "  box-shadow: none !important;",
-      "  transition: none !important;",
-      "}"
-    ].join("\n");
-    var st = d.createElement("style"); st.textContent = css; d.head.appendChild(st);
-  })();
+    // Markup inside shadow
+    var wrap = d.createElement("div");
+    wrap.className = "wrap";
+    wrap.innerHTML = `
+      <h1>Your Privacy Choices</h1>
+      <label>
+        <input id="privacy-optout" type="checkbox" ${isOptedOut() ? "checked" : ""}>
+        <span>Do not sell or share my personal information / opt out of targeted advertising. We also honor browser signals like Global Privacy Control.</span>
+      </label>
+      <div class="row">
+        <button id="privacy-save">Save</button>
+        <button id="privacy-close">Close</button>
+      </div>
+      <details>
+        <summary>Privacy Notice (summary)</summary>
+        <div style="margin-top:8px;">
+          This site collects site-activity data (pages viewed, clicks, scrolls, time on page, and technical identifiers) and shares it with our analytics/identity vendor to measure performance and provide interest-based services. Use the control above to opt out of sale/share or targeted advertising. We honor Global Privacy Control signals. We do not knowingly sell/share personal information of consumers under 16. For a full policy, see the website’s Privacy Policy.
+        </div>
+      </details>
+    `;
+    root.appendChild(wrap);
 
-  panel.innerHTML =
-    '<div style="font-weight:600;margin-bottom:6px;">Your Privacy Choices</div>'+
-    '<label style="display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px;">'+
-    '<input id="privacy-optout" type="checkbox" '+(isOptedOut()?'checked':'')+' />'+
-    '<span>Do not sell or share my personal information / opt out of targeted advertising. We also honor browser signals like Global Privacy Control.</span>'+
-    '</label>'+
-    '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
-    // Buttons: text & border use panel text color; backgrounds fixed; no hover change
-    '<button id="privacy-save" style="padding:6px 10px;border:1px solid currentColor;border-radius:8px;background:#fff;cursor:pointer;color:inherit;">Save</button>'+
-    '<button id="privacy-close" style="padding:6px 10px;border:1px solid currentColor;border-radius:8px;background:#fff;cursor:pointer;color:inherit;">Close</button>'+
-    '</div>'+
-    '<details style="font-size:12px;color:#555;"><summary style="cursor:pointer">Privacy Notice (summary)</summary>'+
-    '<div style="margin-top:8px;">This site collects site-activity data (pages viewed, clicks, scrolls, time on page, and technical identifiers) and shares it with our analytics/identity vendor to measure performance and provide interest-based services. Use the control above to opt out of sale/share or targeted advertising. We honor Global Privacy Control signals. We do not knowingly sell/share personal information of consumers under 16. For a full policy, see the website’s Privacy Policy.</div>'+
-    '</details>';
-  d.body.appendChild(panel);
-
-  // Wire panel actions
-  panel.querySelector("#privacy-close").onclick = function(){ panel.style.display = "none"; };
-  panel.querySelector("#privacy-save").onclick = function(){
-    var checked = panel.querySelector("#privacy-optout").checked;
-    setOptOut(checked);
-    panel.style.display = "none";
-  };
-
-  // Inject centered, grey footer link that opens the panel
-  try {
-    var linkWrap = d.createElement("div");
-    linkWrap.style.cssText = "width:100%;text-align:center;margin-top:2px;margin-bottom:6px;";
-
-    var footerLink = d.createElement("a");
-    footerLink.href = "javascript:void(0)";
-    footerLink.textContent = "Do Not Sell or Share My Personal Information";
-    footerLink.style.cssText = "color:#666;font-size:12px;text-decoration:none;cursor:pointer;";
-    footerLink.onclick = function(){
-      panel.style.display = (panel.style.display === "none" ? "block" : "none");
+    // Wire actions
+    root.getElementById("privacy-close").onclick = function(){ panel.style.display = "none"; };
+    root.getElementById("privacy-save").onclick = function(){
+      var checked = root.getElementById("privacy-optout").checked;
+      setOptOut(checked);
+      panel.style.display = "none";
     };
 
-    linkWrap.appendChild(footerLink);
+    // Footer link to open/close panel
+    try {
+      var linkWrap = d.createElement("div");
+      linkWrap.style.cssText = "width:100%;text-align:center;margin-top:2px;margin-bottom:6px;";
 
-    var footers = d.getElementsByTagName("footer");
-    if (footers && footers[0]) {
-      footers[0].appendChild(linkWrap);
-    } else {
-      d.body.appendChild(linkWrap);
-    }
-  } catch(e){}
+      var footerLink = d.createElement("a");
+      footerLink.href = "javascript:void(0)";
+      footerLink.textContent = "Do Not Sell or Share My Personal Information";
+      footerLink.style.cssText = "color:#666;font-size:12px;text-decoration:none;cursor:pointer;";
+      footerLink.onclick = function(){
+        panel.style.display = (panel.style.display === "none" ? "block" : "none");
+      };
 
-}
+      linkWrap.appendChild(footerLink);
 
+      var footers = d.getElementsByTagName("footer");
+      if (footers && footers[0]) {
+        footers[0].appendChild(linkWrap);
+      } else {
+        d.body.appendChild(linkWrap);
+      }
+    } catch(e){}
+  }
 
   // 5) Expose a minimal API for sites that also want a footer link
   w.PrivacyChoices = {
