@@ -1,15 +1,22 @@
 (function (w, d) {
-  // 1) Your Pixel Express pixel URL (default-on unless GPC/UOOM or user opt-out)
+  // =========================
+  // Pixel Express Privacy + Loader (WP-safe, style-isolated)
+  // =========================
+
+  // 1) Pixel URL & script tag id
   var PIXEL_URL = "https://cdn.v3.identitypxl.app/pixels/60162b0b-db55-4393-96b5-f134c36ca853/p.js";
   var PIXEL_ID  = "pixelexpress-superpixel";
 
-  // 2) Simple local opt-out key (persisted per browser)
-  var OPT_KEY = "us_privacy_optout"; // "1"=opted-out, otherwise allowed
+  // 2) Local opt-out key (persisted per browser)
+  var OPT_KEY = "us_privacy_optout"; // "1" = opted-out
 
-  // 3) Honor Universal Opt-Out / Global Privacy Control if present
+  // 3) GPC / UOOM
   var hasGPC = !!(w.navigator && w.navigator.globalPrivacyControl === true);
 
-  function isOptedOut() { return hasGPC || (w.localStorage && localStorage.getItem(OPT_KEY) === "1"); }
+  function isOptedOut() {
+    try { return hasGPC || (w.localStorage && localStorage.getItem(OPT_KEY) === "1"); }
+    catch(e){ return hasGPC; }
+  }
 
   function loadPixel() {
     if (isOptedOut() || d.getElementById(PIXEL_ID)) return;
@@ -17,173 +24,133 @@
     s.src = PIXEL_URL; s.async = true; s.id = PIXEL_ID;
     d.head.appendChild(s);
   }
+
   function removePixel() {
     var s = d.getElementById(PIXEL_ID);
     if (s) s.remove();
-    // If the vendor sets first-party cookies and you know their names, clear them here.
+    // If the vendor sets first-party cookies and you know names, clear them here.
   }
+
   function setOptOut(on) {
     try { localStorage.setItem(OPT_KEY, on ? "1" : "0"); } catch (e) {}
-    if (on) removePixel(); else if (!hasGPC) loadPixel();
+    if (on) { removePixel(); } else if (!hasGPC) { loadPixel(); }
   }
 
-  // 4) Shadow-DOM Panel (stable across themes)
+  // 4) UI (Do Not Sell/Share / Targeted Ads opt-out) — style-encapsulated via Shadow DOM
   function injectPrivacyUI() {
-    if (d.getElementById("px-privacy-host")) return;
+    if (d.getElementById("pxx-privacy-widget")) return;
 
-    // Shadow host sits at top-level; very high z-index to sit above WP headers/menus
+    // Host container anchored to viewport, immune to site layouts
     var host = d.createElement("div");
-    host.id = "px-privacy-host";
-    host.style.position = "fixed";
-    host.style.left = "50%";
-    host.style.transform = "translateX(-50%)";
-    host.style.bottom = "56px";
-    host.style.zIndex = "2147483647"; // max-ish
-    host.style.display = "none";      // hidden until toggled
+    host.id = "pxx-privacy-widget";
+    // Prevent site CSS from affecting placement; pointer-events to let clicks through except our children
+    host.style.cssText = "position:fixed;left:0;bottom:0;width:100%;z-index:2147483647;pointer-events:none;";
     d.body.appendChild(host);
 
-    // Attach shadow root to isolate styles from any WordPress theme/CSS
-    var root = host.attachShadow({ mode: "open" });
+    // Shadow root for style isolation (fallback to light DOM if unsupported)
+    var root = host.attachShadow ? host.attachShadow({mode:"open"}) : host;
+
+    // Build styles (reset + our UI). Everything is self-contained and unaffected by theme CSS.
     var style = d.createElement("style");
-    style.textContent = `
-      :host {
-        all: initial; /* isolate from page CSS */
-        position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 56px;
-        z-index: 2147483647;
-      }
-      @media (max-width: 600px) {
-        :host {
-          left: 5px !important;
-          right: 5px !important;
-          transform: none !important;
-        }
-      }
+    style.textContent = [
+      /* Baseline reset inside shadow */
+      "*{all:initial;box-sizing:border-box;} :host{all:initial;}",
+      /* Re-enable pointer events for our UI */
+      ".pxx-wrap{pointer-events:auto;}",
+      /* Base typography/colors */
+      ".pxx{font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;}",
+      /* Footer link bar (fixed, centered) */
+      ".pxx-linkbar{position:fixed;left:0;bottom:6px;width:100%;text-align:center;}",
+      ".pxx-link{display:inline-block;text-decoration:none;cursor:pointer;color:#666;font-size:12px;padding:4px 8px;border-radius:6px;}",
+      ".pxx-link:hover,.pxx-link:active,.pxx-link:focus{color:#666;}",
 
-      /* Base reset inside shadow */
-      *, *::before, *::after { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
-      button { -webkit-appearance: none; appearance: none; }
+      /* Panel container (bottom centered by default) */
+      ".pxx-panel{position:fixed;left:50%;transform:translateX(-50%);bottom:56px;max-width:360px;",
+      "  background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);",
+      "  padding:12px 14px;display:none;}",
 
-      .panel {
-        background: #fff;
-        border: 1px solid #ccc;
-        border-radius: 12px;
-        box-shadow: 0 6px 24px rgba(0,0,0,.15);
-        padding: 12px 14px;
-        max-width: 360px;
-        font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        color: #222;
-      }
-      @media (max-width: 600px) {
-        .panel { width: 100%; max-width: none; }
-      }
+      /* Mobile: span to 5px from edges */
+      "@media (max-width:600px){",
+      "  .pxx-panel{left:5px;right:5px;transform:none;max-width:none;width:auto;}",
+      "}",
 
-      .title { font-weight: 600; margin: 0 0 6px 0; }
-      .row { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 10px; }
-      .row input { margin-top: 2px; }
+      /* Header & text */
+      ".pxx-title{font-weight:600;margin:0 0 6px 0;}",
+      ".pxx-row{display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px;}",
+      ".pxx-note{font-size:12px;color:#555;margin-top:8px;}",
 
-      .actions { display: flex; gap: 8px; margin-bottom: 8px; }
+      /* Buttons: fixed look, no hover/active change; border matches current text color */
+      ".pxx-actions{display:flex;gap:8px;margin-bottom:8px;}",
+      ".pxx-btn{padding:6px 10px;border:1px solid currentColor;border-radius:8px;background:#fff;cursor:pointer;color:inherit;}",
+      ".pxx-btn:hover,.pxx-btn:active,.pxx-btn:focus{background:#fff;outline:none;box-shadow:none;}",
 
-      .btn {
-        padding: 6px 10px;
-        border: 1px solid currentColor;
-        border-radius: 8px;
-        background: #fff;
-        color: inherit;
-        cursor: pointer;
-        line-height: 1.2;
-        outline: none;
-        box-shadow: none;
-        transition: none;
-        user-select: none;
-      }
-      /* Freeze hover/active/focus so themes can't restyle */
-      .btn:hover, .btn:active, .btn:focus {
-        background: #fff;
-        color: inherit;
-        border-color: currentColor;
-        outline: none;
-        box-shadow: none;
-      }
+      /* Checkbox alignment */
+      ".pxx-checkbox{margin-top:2px;}",
 
-      details { font-size: 12px; color: #555; }
-      details > summary { cursor: pointer; list-style: none; }
-      details > summary::-webkit-details-marker { display: none; }
-    `;
+      /* Details summary (uses our base font) */
+      "details{font-size:12px;color:#555;}",
+      "summary{cursor:pointer;}"
+    ].join("");
 
+    // Build HTML
     var wrap = d.createElement("div");
-    wrap.className = "panel";
-    wrap.innerHTML = `
-      <div class="title">Your Privacy Choices</div>
-      <label class="row">
-        <input id="privacy-optout" type="checkbox" />
-        <span>Do not sell or share my personal information / opt out of targeted advertising. We also honor browser signals like Global Privacy Control.</span>
-      </label>
-      <div class="actions">
-        <button id="privacy-save" class="btn">Save</button>
-        <button id="privacy-close" class="btn">Close</button>
-      </div>
-      <details>
-        <summary>Privacy Notice (summary)</summary>
-        <div style="margin-top:8px;">
-          This site collects site-activity data (pages viewed, clicks, scrolls, time on page, and technical identifiers) and shares it with our analytics/identity vendor to measure performance and provide interest-based services. Use the control above to opt out of sale/share or targeted advertising. We honor Global Privacy Control signals. We do not knowingly sell/share personal information of consumers under 16. For a full policy, see the website’s Privacy Policy.
-        </div>
-      </details>
-    `;
+    wrap.className = "pxx-wrap pxx";
+    wrap.innerHTML = [
+      // Footer link (fixed, consistent across themes)
+      '<div class="pxx-linkbar"><a class="pxx-link" id="pxx-open" role="button">Do Not Sell or Share My Personal Information</a></div>',
+      // Panel
+      '<div class="pxx-panel" id="pxx-panel">',
+      '  <div class="pxx-title">Your Privacy Choices</div>',
+      '  <label class="pxx-row"><input class="pxx-checkbox" id="privacy-optout" type="checkbox" />',
+      '    <span>Do not sell or share my personal information / opt out of targeted advertising. We also honor browser signals like Global Privacy Control.</span>',
+      '  </label>',
+      '  <div class="pxx-actions">',
+      '    <button class="pxx-btn" id="privacy-save">Save</button>',
+      '    <button class="pxx-btn" id="privacy-close">Close</button>',
+      '  </div>',
+      '  <details><summary>Privacy Notice (summary)</summary>',
+      '    <div class="pxx-note">This site collects site-activity data (pages viewed, clicks, scrolls, time on page, and technical identifiers) and shares it with our analytics/identity vendor to measure performance and provide interest-based services. Use the control above to opt out of sale/share or targeted advertising. We honor Global Privacy Control signals. We do not knowingly sell/share personal information of consumers under 16. For a full policy, see the website’s Privacy Policy.</div>',
+      '  </details>',
+      '</div>'
+    ].join("");
 
+    // Mount into shadow root
     root.appendChild(style);
     root.appendChild(wrap);
 
-    // Initialize checkbox state
-    var cb = wrap.querySelector("#privacy-optout");
-    cb.checked = isOptedOut();
+    // Hook up behavior (query within shadow)
+    var panel = (root.getElementById ? root.getElementById("pxx-panel") : wrap.querySelector("#pxx-panel"));
+    var open  = (root.getElementById ? root.getElementById("pxx-open") : wrap.querySelector("#pxx-open"));
+    var save  = (root.getElementById ? root.getElementById("privacy-save") : wrap.querySelector("#privacy-save"));
+    var close = (root.getElementById ? root.getElementById("privacy-close") : wrap.querySelector("#privacy-close"));
+    var box   = (root.getElementById ? root.getElementById("privacy-optout") : wrap.querySelector("#privacy-optout"));
 
-    // Wire actions
-    wrap.querySelector("#privacy-close").onclick = function () { host.style.display = "none"; };
-    wrap.querySelector("#privacy-save").onclick  = function () {
-      setOptOut(cb.checked);
-      host.style.display = "none";
+    // Initialize checkbox from current status
+    try { box.checked = !!isOptedOut(); } catch(e){}
+
+    open.onclick = function(){
+      panel.style.display = (panel.style.display === "none" || !panel.style.display) ? "block" : "none";
     };
-
-    // Expose minimal UI API for external links to open/close/status
-    w.PrivacyChoicesUI = {
-      open:  function(){ cb.checked = isOptedOut(); host.style.display = "block"; },
-      close: function(){ host.style.display = "none"; },
-      toggle:function(){ (host.style.display === "none" || !host.style.display) ? this.open() : this.close(); }
+    close.onclick = function(){ panel.style.display = "none"; };
+    save.onclick  = function(){
+      setOptOut(!!box.checked);
+      panel.style.display = "none";
     };
-
-    // Also add a centered footer link on the page (outside shadow)
-    try {
-      var linkWrap = d.createElement("div");
-      linkWrap.style.cssText = "width:100%;text-align:center;margin-top:2px;margin-bottom:6px;";
-      var footerLink = d.createElement("a");
-      footerLink.href = "javascript:void(0)";
-      footerLink.textContent = "Do Not Sell or Share My Personal Information";
-      footerLink.style.cssText = "color:#666;font-size:12px;text-decoration:none;cursor:pointer;";
-      footerLink.onclick = function(){ w.PrivacyChoicesUI.toggle(); };
-
-      linkWrap.appendChild(footerLink);
-      var footers = d.getElementsByTagName("footer");
-      if (footers && footers[0]) { footers[0].appendChild(linkWrap); }
-      else { d.body.appendChild(linkWrap); }
-    } catch(e){}
   }
 
-  // 5) Expose a minimal API for scripts: status/opt-in/opt-out
+  // 5) Public API
   w.PrivacyChoices = {
-    optOut: function(){ setOptOut(true);  if (w.PrivacyChoicesUI) w.PrivacyChoicesUI.close(); },
-    optIn:  function(){ setOptOut(false); if (!hasGPC) loadPixel(); if (w.PrivacyChoicesUI) w.PrivacyChoicesUI.close(); },
+    optOut: function(){ setOptOut(true); },
+    optIn:  function(){ setOptOut(false); },
     status: function(){ return { gpc: hasGPC, optedOut: isOptedOut() }; }
   };
 
   // 6) Boot
   function boot(){ injectPrivacyUI(); loadPixel(); }
-  if (d.readyState === "loading") d.addEventListener("DOMContentLoaded", boot); else boot();
+  if (d.readyState === "loading") { d.addEventListener("DOMContentLoaded", boot); } else { boot(); }
 
-  // (Optional) Handle SPA soft navigations
-  var _push = history.pushState; history.pushState = function(){ _push.apply(this, arguments); loadPixel(); };
+  // (Optional) SPA soft navigations
+  var _push = history.pushState;
+  history.pushState = function(){ _push.apply(this, arguments); loadPixel(); };
   w.addEventListener("popstate", loadPixel);
 })(window, document);
