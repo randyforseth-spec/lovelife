@@ -34,38 +34,24 @@ function injectPrivacyUI() {
 // Create centered privacy panel (desktop), with mobile full-width minus 10px
 var panel = d.createElement("div");
 panel.id = "privacy-choices-panel";
-panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:2147483647;background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:12px 14px;max-width:360px;max-height:calc(100vh - 24px);overflow:auto;box-sizing:border-box;display:none;font:14px/1.45 system-ui,sans-serif;";
+panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:56px;z-index:99999;background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:12px 14px;max-width:360px;display:none;font:14px/1.45 system-ui,sans-serif;";
 
 // Mobile override: 5px margins on left/right
 (function(){
   var css = [
-    /* Ensure it's always above theme elements and never clipped */
-    "#privacy-choices-panel{",
-    "  position:fixed !important;",
-    "  z-index:2147483647 !important;",
-    "  max-height:calc(100vh - 24px) !important;",
-    "  overflow:auto !important;",
-    "  box-sizing:border-box !important;",
-    "}",
-
-    /* Mobile: full width with safe margins; keep within viewport bottom */
     "@media (max-width: 600px){",
     "  #privacy-choices-panel{",
-    "    left:8px !important;",
-    "    right:8px !important;",
+    "    left:5px !important;",
+    "    right:5px !important;",
     "    transform:none !important;",
-    "    width:auto !important;",
     "    max-width:none !important;",
-    "    bottom:12px !important;",
+    "    width:auto !important;",
     "  }",
-    "}",
-
-    /* iOS safe-area support */
-    "@supports (padding: max(0px)){",
-    "  #privacy-choices-panel{ padding-bottom: max(12px, env(safe-area-inset-bottom)); }",
     "}"
-  ].join("\n");
-  var st = d.createElement("style"); st.textContent = css; d.head.appendChild(st);
+  ].join("");
+  var st = d.createElement("style");
+  st.textContent = css;
+  d.head.appendChild(st);
 })();
 
 
