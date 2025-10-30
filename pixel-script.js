@@ -27,35 +27,42 @@
     if (on) removePixel(); else if (!hasGPC) loadPixel();
   }
 
-  // 4) Panel (Do Not Sell/Share / Targeted Ads opt-out)
+// 4) Panel (Do Not Sell/Share / Targeted Ads opt-out)
 function injectPrivacyUI() {
   if (d.getElementById("privacy-choices-panel")) return;
 
-// Create centered privacy panel (desktop), with mobile full-width minus 10px
-var panel = d.createElement("div");
-panel.id = "privacy-choices-panel";
-panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:56px;z-index:99999;background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:12px 14px;max-width:360px;display:none;font:14px/1.45 system-ui,sans-serif;";
+  // Create the panel shell
+  var panel = d.createElement("div");
+  panel.id = "privacy-choices-panel";
+  panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:56px;z-index:99999;background:#fff;border:1px solid #ccc;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:12px 14px;max-width:360px;display:none;font:14px/1.45 system-ui,sans-serif;";
+  // Force correct sizing even if theme CSS is hostile
+  panel.style.setProperty('height','auto','important');
+  panel.style.setProperty('min-height','180px','important');
+  panel.style.setProperty('overflow','visible','important');
+  panel.style.setProperty('display','none','important'); // stay hidden until toggled
 
-// Mobile override: 5px margins on left/right
-(function(){
-  var css = [
-    "@media (max-width: 600px){",
-    "  #privacy-choices-panel{",
-    "    left:5px !important;",
-    "    right:5px !important;",
-    "    transform:none !important;",
-    "    max-width:none !important;",
-    "    width:auto !important;",
-    "  }",
-    "}"
-  ].join("");
-  var st = d.createElement("style");
-  st.textContent = css;
-  d.head.appendChild(st);
-})();
+  // HARDENING CSS: isolate from site CSS and enforce layout
+  (function(){
+    var css = [
+      "#privacy-choices-panel *{all:revert;box-sizing:border-box;}",
+      "#privacy-choices-panel{",
+      "  position:fixed !important; left:50% !important; transform:translateX(-50%) !important;",
+      "  bottom:56px !important; z-index:2147483647 !important;",
+      "  background:#fff !important; color:#111 !important;",
+      "  border:1px solid #ccc !important; border-radius:12px !important;",
+      "  box-shadow:0 6px 24px rgba(0,0,0,.15) !important;",
+      "  padding:12px 14px !important; max-width:360px !important; min-width:280px !important;",
+      "  height:auto !important; min-height:180px !important; overflow:visible !important;",
+      "  font:14px/1.45 system-ui,sans-serif !important;",
+      "}",
+      "@media (max-width:600px){",
+      "  #privacy-choices-panel{left:5px !important; right:5px !important; transform:none !important; max-width:none !important; width:auto !important;}",
+      "}"
+    ].join("\n");
+    var st = d.createElement("style"); st.id = "privacy-choices-hardening"; st.textContent = css; d.head.appendChild(st);
+  })();
 
-
-  // Freeze hover/active/focus styles for Save/Close and inherit panel text color
+  // Freeze hover/active/focus styles for Save/Close (stable in dark/incognito)
   (function(){
     var css = [
       "#privacy-save, #privacy-close,",
@@ -73,6 +80,7 @@ panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom
     var st = d.createElement("style"); st.textContent = css; d.head.appendChild(st);
   })();
 
+  // Panel contents
   panel.innerHTML =
     '<div style="font-weight:600;margin-bottom:6px;">Your Privacy Choices</div>'+
     '<label style="display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px;">'+
@@ -80,24 +88,26 @@ panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom
     '<span>Do not sell or share my personal information / opt out of targeted advertising. We also honor browser signals like Global Privacy Control.</span>'+
     '</label>'+
     '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
-    // Buttons: text & border use panel text color; backgrounds fixed; no hover change
     '<button id="privacy-save" style="padding:6px 10px;border:1px solid currentColor;border-radius:8px;background:#fff;cursor:pointer;color:inherit;">Save</button>'+
     '<button id="privacy-close" style="padding:6px 10px;border:1px solid currentColor;border-radius:8px;background:#fff;cursor:pointer;color:inherit;">Close</button>'+
     '</div>'+
     '<details style="font-size:12px;color:#555;"><summary style="cursor:pointer">Privacy Notice (summary)</summary>'+
     '<div style="margin-top:8px;">This site collects site-activity data (pages viewed, clicks, scrolls, time on page, and technical identifiers) and shares it with our analytics/identity vendor to measure performance and provide interest-based services. Use the control above to opt out of sale/share or targeted advertising. We honor Global Privacy Control signals. We do not knowingly sell/share personal information of consumers under 16. For a full policy, see the website’s Privacy Policy.</div>'+
     '</details>';
+
   d.body.appendChild(panel);
 
   // Wire panel actions
-  panel.querySelector("#privacy-close").onclick = function(){ panel.style.display = "none"; };
+  panel.querySelector("#privacy-close").onclick = function(){
+    panel.style.setProperty('display','none','important');
+  };
   panel.querySelector("#privacy-save").onclick = function(){
     var checked = panel.querySelector("#privacy-optout").checked;
     setOptOut(checked);
-    panel.style.display = "none";
+    panel.style.setProperty('display','none','important');
   };
 
-  // Inject centered, grey footer link that opens the panel
+  // Footer link that toggles the panel
   try {
     var linkWrap = d.createElement("div");
     linkWrap.style.cssText = "width:100%;text-align:center;margin-top:2px;margin-bottom:6px;";
@@ -107,7 +117,8 @@ panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom
     footerLink.textContent = "Do Not Sell or Share My Personal Information";
     footerLink.style.cssText = "color:#666;font-size:12px;text-decoration:none;cursor:pointer;";
     footerLink.onclick = function(){
-      panel.style.display = (panel.style.display === "none" ? "block" : "none");
+      var show = (panel.style.display === "none" || panel.style.display === "");
+      panel.style.setProperty('display', show ? 'block' : 'none', 'important');
     };
 
     linkWrap.appendChild(footerLink);
@@ -119,8 +130,8 @@ panel.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom
       d.body.appendChild(linkWrap);
     }
   } catch(e){}
-
 }
+
 
 
   // 5) Expose a minimal API for sites that also want a footer link
