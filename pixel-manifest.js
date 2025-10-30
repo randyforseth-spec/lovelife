@@ -1,0 +1,2 @@
+// commit-pinned URL to your working script:
+window.PXL_URL = "https://cdn.jsdelivr.net/gh/randyforseth-spec/lovelife@6a6655e0d4fabbba6eab55499d84c7fcee8fd66b/pixel-script.js";
